@@ -1,36 +1,25 @@
-import { TwitterAuthProvider, signInWithPopup } from "firebase/auth";
 import { useAuthState } from "react-firebase-hooks/auth";
 import "./App.css";
 import { auth } from "./services/firebase.config";
+import LoginView from "./views/Login";
+import SubscriptionView from "./views/Subscription";
 
 function App() {
-  const [user] = useAuthState(auth);
+  const [user, loading, error] = useAuthState(auth);
 
-  const signInWithTwitter = async () => {
-    try {
-      await signInWithPopup(auth, new TwitterAuthProvider());
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  const signOut = () => {
-    auth.signOut();
-  };
-
-  return (
-    <div>
-      {user ? (
-        <>
-          <p>Welcome, {user.displayName}!</p>
-          <p>{JSON.stringify(user)}</p>
-          <button onClick={signOut}>Sign out</button>
-        </>
-      ) : (
-        <button onClick={signInWithTwitter}>Sign in with Twitter</button>
-      )}
-    </div>
-  );
+  if (user) {
+    return (
+      <>
+        <SubscriptionView user={user} />
+      </>
+    );
+  } else {
+    return (
+      <>
+        <LoginView loading={loading} error={error} />
+      </>
+    );
+  }
 }
 
 export default App;
