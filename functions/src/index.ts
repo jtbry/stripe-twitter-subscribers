@@ -1,9 +1,8 @@
-import { QuerySnapshot } from "firebase-admin/firestore";
+import { initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { QuerySnapshot, getFirestore } from "firebase-admin/firestore";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { onRequest } from "firebase-functions/v2/https";
-const { initializeApp } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
-const { getAuth } = require("firebase-admin/auth");
 
 initializeApp();
 
@@ -80,7 +79,12 @@ export const handleStripeEvents = onRequest(async (request, response) => {
 export const checkSubscriptionStatus = onRequest(
   { secrets: [stripeApiKey] },
   async (request, response) => {
-    const user = await getAuth().verifyIdToken(request.query.token);
+    if (!request.query.token) {
+      response.status(400).json({ status: "none" });
+      return;
+    }
+
+    const user = await getAuth().verifyIdToken(request.query.token as string);
     const subscription: QuerySnapshot = await getFirestore()
       .collection("subscriptions")
       .where("email", "==", user.email)
