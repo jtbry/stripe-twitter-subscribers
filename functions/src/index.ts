@@ -36,9 +36,8 @@ export const subscribe = onRequest(async (request, response) => {
 
 export const handleStripeEvents = onRequest(async (request, response) => {
   const signature = request.headers["stripe-signature"] as string;
-  const payload = request.body;
   const event = await stripe.webhooks.constructEventAsync(
-    payload,
+    request.rawBody,
     signature,
     stripeWebhookSecret.value()
   );
