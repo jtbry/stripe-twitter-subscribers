@@ -26,5 +26,6 @@ module.exports = {
   rules: {
     "prettier/prettier": "error",
     "import/no-unresolved": 0,
+    "trailing-comma": "off",
   },
 };
