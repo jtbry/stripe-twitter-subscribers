@@ -44,7 +44,8 @@ export const handleStripeEvents = onRequest(async (request, response) => {
 
   // Handle the event
   switch (event.type) {
-    case "customer.subscription.updated": {
+    case "customer.subscription.updated":
+    case "customer.subscription.created": {
       const subscription = event.data.object;
       await getFirestore()
         .collection("subscriptions")
