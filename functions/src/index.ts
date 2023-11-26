@@ -50,13 +50,16 @@ export const checkSubscriptionStatus = onRequest(async (request, response) => {
   if (subscription.empty) {
     response.json({ status: "none" });
   } else {
-    const status = subscription.docs[0].data().status;
+    const sub = subscription.docs[0].data();
     const portal = await stripe.billingPortal.sessions.create({
       customer: subscription.docs[0].data().customerId,
       return_url: `${frontendUrl.value()}`,
     });
-    const cancelAt = subscription.docs[0].data().cancelAt;
-    response.json({ status, portalUrl: portal.url, cancelAt: cancelAt });
+
+    response.json({
+      ...sub,
+      portalUrl: portal.url,
+    });
   }
 });
 
@@ -64,17 +67,6 @@ export const checkSubscriptionStatus = onRequest(async (request, response) => {
  * A webhook handler function for the relevant Stripe events.
  */
 export const handleStripeEvents = onRequest(async (req, resp) => {
-  const relevantEvents = new Set([
-    "customer.subscription.created",
-    "customer.subscription.updated",
-    "customer.subscription.deleted",
-    "invoice.paid",
-    "invoice.payment_succeeded",
-    "invoice.payment_failed",
-    "invoice.upcoming",
-    "invoice.marked_uncollectible",
-    "invoice.payment_action_required",
-  ]);
   let event: Stripe.Event;
 
   // Instead of getting the `Stripe.Event`
@@ -93,104 +85,130 @@ export const handleStripeEvents = onRequest(async (req, resp) => {
     return;
   }
 
-  if (relevantEvents.has(event.type)) {
-    logger.info(event.id, event.type);
-    try {
-      switch (event.type) {
-        case "customer.subscription.created":
-        case "customer.subscription.updated":
-        case "customer.subscription.deleted": {
-          const subscription = event.data.object as Stripe.Subscription;
-          await getFirestore()
-            .collection("subscriptions")
-            .where("customerId", "==", subscription.customer)
-            .get()
-            .then(async (snapshot) => {
-              if (!snapshot.empty) {
-                await snapshot.docs[0].ref.update({
-                  status: subscription.status,
-                  cancelAt: subscription.cancel_at,
-                });
-              } else {
-                const customer = await stripe.customers.retrieve(
-                  subscription.customer as string
-                );
-                const c = customer as Stripe.Customer;
-
-                await getFirestore().collection("subscriptions").add({
-                  customerId: subscription.customer,
-                  email: c.email,
-                  status: subscription.status,
-                  cancelAt: subscription.cancel_at,
-                });
-              }
-            });
+  logger.info(event.id, event.type);
+  try {
+    switch (event.type) {
+      case "customer.subscription.deleted": {
+        const subscription = event.data.object as Stripe.Subscription;
+        if (
+          !subscription.items.data.find(
+            (i) => i.price.id == subscriptionPriceId.value()
+          )
+        ) {
+          // Ignore subscription created/updated events for different products
           break;
         }
 
-        case "invoice.paid":
-        case "invoice.payment_succeeded":
-        case "invoice.payment_failed":
-        case "invoice.upcoming":
-        case "invoice.marked_uncollectible":
-        case "invoice.payment_action_required": {
-          const invoice = event.data.object as Stripe.Invoice;
-          let subscription: Stripe.Subscription | undefined;
-          if (invoice.subscription) {
-            subscription = await stripe.subscriptions.retrieve(
-              invoice.subscription as string
-            );
-          }
-          const statusMap = {
-            paid: "active",
-            open: "incomplete",
-            draft: "incomplete",
-            none: "incomplete",
-            void: "canceled",
-            uncollectible: "past_due",
-          };
-
-          await getFirestore()
-            .collection("subscriptions")
-            .where("customerId", "==", invoice.customer)
-            .get()
-            .then(async (snapshot) => {
-              if (!snapshot.empty) {
-                await snapshot.docs[0].ref.update({
-                  status: statusMap[invoice.status ?? "none"],
-                  cancelAt: subscription?.cancel_at,
-                });
-              } else {
-                await getFirestore()
-                  .collection("subscriptions")
-                  .add({
-                    customerId: invoice.customer,
-                    email: invoice.customer_email,
-                    status: statusMap[invoice.status ?? "none"],
-                    cancelAt: subscription?.cancel_at,
-                  });
-              }
-            });
-          break;
-        }
-        default:
-          logger.warn(
-            new Error("Unhandled relevant event!"),
-            event.id,
-            event.type
-          );
+        await getFirestore()
+          .collection("subscriptions")
+          .where("customerId", "==", event.data.object.customer)
+          .get()
+          .then(async (snapshot) => {
+            if (!snapshot.empty) {
+              snapshot.docs[0].ref.delete();
+            }
+          });
+        break;
       }
 
-      logger.info(event.id, event.type);
-    } catch (error) {
-      logger.info(error, event.id, event.type);
-      resp.json({
-        error: "Webhook handler failed. View function logs in Firebase.",
-      });
-      return;
+      case "customer.subscription.created":
+      case "customer.subscription.updated": {
+        const subscription = event.data.object as Stripe.Subscription;
+        if (
+          !subscription.items.data.find(
+            (i) => i.price.id == subscriptionPriceId.value()
+          )
+        ) {
+          // Ignore subscription created/updated events for different products
+          logger.info(
+            "Ignoring subscription event for different product",
+            subscription.items.data,
+            subscriptionPriceId.value()
+          );
+          break;
+        }
+        const customer = (await stripe.customers.retrieve(
+          subscription.customer as string
+        )) as Stripe.Customer;
+
+        await updateSubscription(customer.email, subscription);
+        logger.info("Subscription Created/Updated", subscription);
+        break;
+      }
+
+      case "invoice.paid": {
+        const invoice = event.data.object as Stripe.Invoice;
+
+        // Only update the subscription status if it is a subscription invoice
+        if (
+          !invoice.lines.data.find(
+            (l) => l.price && l.price.id === subscriptionPriceId.value()
+          )
+        ) {
+          break;
+        }
+
+        if (invoice.subscription) {
+          const subscription = await stripe.subscriptions.retrieve(
+            invoice.subscription as string
+          );
+
+          if (subscription) {
+            await updateSubscription(invoice.customer_email, subscription);
+            logger.info(
+              "Invoice Paid, updated subscription",
+              invoice,
+              subscription
+            );
+          } else {
+            logger.warn("Failed to update subscription", invoice);
+          }
+        }
+
+        break;
+      }
+
+      default:
+        logger.warn(new Error("Unhandled event"), event.id, event.type);
+        break;
     }
+  } catch (error) {
+    logger.error(error);
+    resp.status(500).json({
+      error: "Webhook handler failed. View Firebase log for details.",
+    });
+    return;
   }
 
   // Return a response to Stripe to acknowledge receipt of the event.
   resp.json({ received: true });
 });
+
+const updateSubscription = async (
+  customerEmail: string | null,
+  subscription: Stripe.Subscription
+) => {
+  await getFirestore()
+    .collection("subscriptions")
+    .where("email", "==", customerEmail)
+    .get()
+    .then(async (snapshot) => {
+      if (!snapshot.empty) {
+        // Update existing subscribption
+        await snapshot.docs[0].ref.update({
+          status: subscription.status,
+          cancelAt: subscription.cancel_at,
+          cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        });
+      } else {
+        // Create new subscription
+        await getFirestore().collection("subscriptions").add({
+          customerId: subscription.customer,
+          email: customerEmail,
+          status: subscription.status,
+          cancelAt: subscription.cancel_at,
+          cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        });
+      }
+    });
+};

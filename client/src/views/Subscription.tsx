@@ -48,18 +48,14 @@ const SubscriptionView = (props: SubscriptionViewProps): JSX.Element => {
   }
 
   let managementElement = <></>;
-  if (
-    subscriptionStatus?.status &&
-    subscriptionStatus.status !== "none" &&
-    subscriptionStatus.status !== "canceled"
-  ) {
+  if (subscriptionStatus?.status && subscriptionStatus.status !== "none") {
     managementElement = (
       <>
         <h2>
           Subscription Status: {subscriptionStatus.status}{" "}
           {subscriptionStatus.cancelAt &&
             `expiring on ${new Date(
-              subscriptionStatus.cancelAt
+              subscriptionStatus.cancelAt * 1000
             ).toLocaleDateString()}`}
         </h2>
         <a
