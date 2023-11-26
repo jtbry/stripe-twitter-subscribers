@@ -9,6 +9,7 @@ interface SubscriptionViewProps {
 interface SubscriptionStatus {
   status: string;
   portalUrl: string;
+  cancelAt: number;
 }
 
 const SubscriptionView = (props: SubscriptionViewProps): JSX.Element => {
@@ -47,10 +48,20 @@ const SubscriptionView = (props: SubscriptionViewProps): JSX.Element => {
   }
 
   let managementElement = <></>;
-  if (subscriptionStatus?.status && subscriptionStatus.status !== "none") {
+  if (
+    subscriptionStatus?.status &&
+    subscriptionStatus.status !== "none" &&
+    subscriptionStatus.status !== "canceled"
+  ) {
     managementElement = (
       <>
-        <h2>Subscription Status: {subscriptionStatus.status}</h2>
+        <h2>
+          Subscription Status: {subscriptionStatus.status}{" "}
+          {subscriptionStatus.cancelAt &&
+            `expiring on ${new Date(
+              subscriptionStatus.cancelAt
+            ).toLocaleDateString()}`}
+        </h2>
         <a
           className="w-1/4 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
           href={subscriptionStatus.portalUrl}
