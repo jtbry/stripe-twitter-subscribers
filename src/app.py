@@ -2,14 +2,13 @@ from functools import wraps
 import os
 from flask import Flask, request
 from dotenv import load_dotenv
-from .stripe import create_checkout_session
-import firebase_admin
+from .stripe import create_checkout_session, create_customer_portal
+from .database import get_subscription
 from firebase_admin import auth
 import logging
 
 load_dotenv()
 
-firebase_app = firebase_admin.initialize_app()
 app = Flask(__name__)
 
 # This decorator will make any decorated route require authentication
@@ -50,10 +49,21 @@ def get_checkout_link(user):
         'url': checkout.url
     }
 
-@app.route('/api/getSubscription')
+@app.route('/api/getMySubscription')
 @require_user
-def get_subscription(user):
-    return user
+def get_my_subscription(user):
+    subscription = get_subscription(user)
+    if not subscription:
+        return {
+            'message': 'Subscription Not Found'
+        }, 404
+        
+    portal_url = create_customer_portal(subscription['customerId'])
+        
+    return {
+        'subscription': subscription,
+        'portal_url': portal_url
+    }
 
 if __name__ == "__main__":
     app.run(debug=True,host='0.0.0.0',port=int(os.environ.get('PORT', 8080)))

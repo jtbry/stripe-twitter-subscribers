@@ -18,3 +18,11 @@ def create_checkout_session(customer_email: str) -> str:
     )
     
     return session
+
+def create_customer_portal(customer_id: str) -> str:
+    portal = stripe.billing_portal.Session.create(
+        customer=customer_id,
+        return_url=os.getenv('FRONTEND_URL')
+    )
+    
+    return portal.url
