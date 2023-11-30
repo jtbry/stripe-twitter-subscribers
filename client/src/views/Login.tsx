@@ -1,25 +1,21 @@
 import { TwitterAuthProvider, signInWithPopup } from "firebase/auth";
+import { useState } from "react";
 import { auth } from "../services/firebase.config";
 
-interface LoginViewProps {
-  loading: boolean;
-  error: Error | undefined;
-}
-
-const LoginView = (props: LoginViewProps): JSX.Element => {
-  const { loading, error } = props;
-
+const LoginView = (): JSX.Element => {
+  const [loading, setLoading] = useState<boolean>();
   const signInWithTwitter = async () => {
+    setLoading(true);
     try {
       await signInWithPopup(auth, new TwitterAuthProvider());
     } catch (error) {
       console.error(error);
     }
+    setLoading(false);
   };
 
   return (
     <>
-      {error && <h1>Error: {error.message}</h1>}
       <div className="flex min-h-full flex-1 flex-col justify-center px-6 py-12 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-sm">
           <h2 className="mt-10 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900">

@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "predeploy": "cd client; npm run build",
     "public": "client/dist",
     "ignore": [
       "firebase.json",
@@ -8,15 +9,9 @@
     ],
     "rewrites": [
       {
-        "source": "/api/subscribe",
-        "function": {
-          "functionId": "subscribe"
-        }
-      },
-      {
-        "source": "/api/checkSubscriptionStatus",
-        "function": {
-          "functionId": "checkSubscriptionStatus"
+        "source": "/api/**",
+        "run": {
+          "serviceId": "subscriber-api"
         }
       },
       {
@@ -24,21 +19,5 @@
         "destination": "/index.html"
       }
     ]
-  },
-  "functions": [
-    {
-      "source": "functions",
-      "codebase": "default",
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log"
-      ],
-      "predeploy": [
-        "npm --prefix \"$RESOURCE_DIR\" run lint",
-        "npm --prefix \"$RESOURCE_DIR\" run build"
-      ]
-    }
-  ]
+  }
 }

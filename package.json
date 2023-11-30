@@ -1,8 +1,0 @@
-{
-  "dependencies": {
-    "firebase": "^10.6.0"
-  },
-  "devDependencies": {
-    "eslint-config-prettier": "^9.0.0"
-  }
-}
