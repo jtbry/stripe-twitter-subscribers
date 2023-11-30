@@ -3,7 +3,7 @@ from .firebase import db
 from firebase_admin.firestore import FieldFilter
 
 def get_subscription(user) -> list:
-    subscription =  db.collection('subscriptions').where(filter=FieldFilter('email', '==', user['email'])).get()
+    subscription = db.collection('subscriptions').where(filter=FieldFilter('email', '==', user['email'])).get()
     
     if not subscription:
         return subscription
@@ -13,3 +13,7 @@ def get_subscription(user) -> list:
         
     return subscription[0].to_dict()
     
+def delete_subscription(subscription):
+    doc = db.collection('subscriptions').where(filter=FieldFilter('customerId', '==', subscription['customer'])).get()
+    if doc:
+        doc.reference.delete()

@@ -26,3 +26,6 @@ def create_customer_portal(customer_id: str) -> str:
     )
     
     return portal.url
+
+def construct_webhook_event(payload, signature):
+    return stripe.Webhook.construct_event(payload, signature, os.getenv('STRIPE_WEBHOOK_SECRET'))
