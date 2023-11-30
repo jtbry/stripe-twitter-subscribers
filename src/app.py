@@ -2,8 +2,8 @@ from functools import wraps
 import os
 from flask import Flask, request
 from dotenv import load_dotenv
-from .stripe import create_checkout_session, create_customer_portal, construct_webhook_event, get_customer, get_subscription
-from .database import get_user_subscription, delete_subscription, update_subscription
+from stripeutil import create_checkout_session, create_customer_portal, construct_webhook_event, get_customer, get_subscription
+from database import get_user_subscription, delete_subscription, update_subscription
 from firebase_admin import auth
 import logging
 
@@ -127,4 +127,5 @@ def stripe_webhook_listener():
     }, 200
 
 if __name__ == "__main__":
-    app.run(debug=True,host='0.0.0.0',port=int(os.environ.get('PORT', 8080)))
+    env = os.getenv('ENVIRONMENT', 'DEV')
+    app.run(debug=(env == 'DEV'),host='0.0.0.0',port=int(os.environ.get('PORT', 8080)))

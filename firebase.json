@@ -11,8 +11,7 @@
       {
         "source": "/api/**",
         "run": {
-          "serviceId": "subscriber-api",
-          "region": "us-central-1"
+          "serviceId": "subscriber-api"
         }
       },
       {

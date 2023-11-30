@@ -1,5 +1,5 @@
 import logging
-from .firebase import db
+from firebase import db
 from firebase_admin.firestore import FieldFilter
 
 def get_user_subscription(user) -> list:
