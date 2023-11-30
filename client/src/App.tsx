@@ -1,24 +1,19 @@
 import { useAuthState } from "react-firebase-hooks/auth";
 import "./App.css";
 import { auth } from "./services/firebase.config";
+import DashboardView from "./views/Dashboard";
 import LoginView from "./views/Login";
-import SubscriptionView from "./views/Subscription";
 
 function App() {
-  const [user, loading, error] = useAuthState(auth);
+  const [user, loading] = useAuthState(auth);
+  if (loading) {
+    return <h1>Loading...</h1>;
+  }
 
   if (user) {
-    return (
-      <>
-        <SubscriptionView user={user} />
-      </>
-    );
+    return <DashboardView user={user} />;
   } else {
-    return (
-      <>
-        <LoginView loading={loading} error={error} />
-      </>
-    );
+    return <LoginView />;
   }
 }
 
