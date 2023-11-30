@@ -27,5 +27,11 @@ def create_customer_portal(customer_id: str) -> str:
     
     return portal.url
 
-def construct_webhook_event(payload, signature):
+def construct_webhook_event(payload: str, signature: str) -> stripe.Event:
     return stripe.Webhook.construct_event(payload, signature, os.getenv('STRIPE_WEBHOOK_SECRET'))
+
+def get_customer(customerId) -> stripe.Customer:
+    return stripe.Customer.retrieve(customerId)
+
+def get_subscription(subscriptionId) -> stripe.Subscription:
+    return stripe.Subscription.retrieve(subscriptionId)

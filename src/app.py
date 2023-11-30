@@ -2,8 +2,8 @@ from functools import wraps
 import os
 from flask import Flask, request
 from dotenv import load_dotenv
-from .stripe import create_checkout_session, create_customer_portal, construct_webhook_event
-from .database import get_subscription, delete_subscription
+from .stripe import create_checkout_session, create_customer_portal, construct_webhook_event, get_customer, get_subscription
+from .database import get_user_subscription, delete_subscription, update_subscription
 from firebase_admin import auth
 import logging
 
@@ -52,7 +52,7 @@ def get_checkout_link(user):
 @app.route('/api/getMySubscription')
 @require_user
 def get_my_subscription(user):
-    subscription = get_subscription(user)
+    subscription = get_user_subscription(user)
     if not subscription:
         return {
             'message': 'Subscription Not Found'
@@ -70,11 +70,20 @@ def stripe_webhook_listener():
     payload = request.get_data(as_text=True)
     sig_header = request.headers.get('Stripe-Signature')
     
-    def object_has_subscription(object) -> bool:
-        for item in object['items']['data']:
-            if item['price']['id'] == os.getenv('SUBSCRIPTION_PRICE_ID'):
-                return True
-        return False
+    def event_for_subscription(object) -> bool:
+        if object['object'] == 'subscription':
+            for obj in object['items']:
+                if obj['price']['id'] == os.getenv('SUBSCRIPTION_PRICE_ID'):
+                    return True
+            return False
+        elif object['object'] == 'invoice':
+            for obj in object['lines']:
+                if obj['price']['id'] == os.getenv('SUBSCRIPTION_PRICE_ID'):
+                    return True
+            return False
+        else:
+            return False
+            
     
     event = None
     try:
@@ -86,14 +95,27 @@ def stripe_webhook_listener():
         }, 500
     
     try:
+        if not event_for_subscription(event.data.object):
+            return {
+                    'message': 'Ignored event for different product'
+                }, 200
+            
         if event['type'] == 'customer.subscription.deleted':
             subscription = event.data.object
-            if not object_has_subscription(subscription):
-                return {
-                    'message': 'Ignored non-desired item'
-                }, 200
-                
             delete_subscription(subscription)
+        elif event['type'] in ['customer.subscription.created', 'customer.subscription.updated']:
+            subscription = event.data.object
+            customer = get_customer(subscription['customer'])
+            update_subscription(customer['email'], subscription)
+        elif event['type'] == 'invoice.paid':
+            invoice = event.data.object
+            
+            if invoice['subscription']:
+                subscription = get_subscription(invoice['subscription'])
+                update_subscription(invoice['customer_email'], subscription)
+        else:
+            logging.warn('Unhandled event', event['id'], event['type'])
+                
     except Exception as ex:
         logging.exception('Unable to process event', ex)
         return {
