@@ -54,7 +54,11 @@ Flock.prototype.enable = function () {
   this.animate(new Date().getTime());
 
   function doResize() {
-    this.canvasResize();
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+
+    this.width = this.canvas.width;
+    this.height = this.canvas.height;
   }
 
   var endResize;
